@@ -1,0 +1,52 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout jadx-mcp
+        uses: actions/checkout@v4
+        with:
+          path: jadx-mcp
+
+      - name: Checkout skylot/jadx
+        uses: actions/checkout@v4
+        with:
+          repository: skylot/jadx
+          path: jadx
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        working-directory: jadx-mcp
+        run: ./gradlew --no-daemon test jar
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jadx-mcp-jar
+          path: jadx-mcp/build/libs/jadx-mcp-*.jar
+
+      - name: Create GitHub Release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: jadx-mcp/build/libs/jadx-mcp-*.jar
+          generate_release_notes: true
