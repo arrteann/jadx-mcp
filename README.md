@@ -16,6 +16,13 @@ Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly 
 
 ---
 
+## Requirements
+
+- **JADX:** `1.5.x` nightly/`dev` build or newer (requires the `jadx-core` API additions merged in PR #3062: `decompileWithMode`, `getSuperClass`, `getInterfaces`, and `getShortId`).
+- **Java:** Java 11+ (tested on macOS, Linux, and Windows, including official JADX bundled JREs without `jdk.httpserver`).
+
+---
+
 ## Build & Test
 
 Requires Java 11+ (uses `options.release = 11`). When `../jadx` is present alongside this directory, Gradle automatically uses the composite build; otherwise configure a published `jadx-core` artifact.
