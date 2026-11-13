@@ -16,8 +16,6 @@ import jadx.api.JavaField;
 import jadx.api.JavaMethod;
 import jadx.api.plugins.input.data.ICodeReader;
 import jadx.api.plugins.input.data.IMethodRef;
-import jadx.api.plugins.input.insns.InsnIndexType;
-import jadx.core.utils.input.InsnDataUtils;
 import jadx.plugins.mcp.McpServerManager;
 import jadx.plugins.mcp.mcp.McpTool;
 import jadx.plugins.mcp.mcp.McpToolRegistry;

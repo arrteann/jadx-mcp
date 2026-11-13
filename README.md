@@ -1,5 +1,9 @@
 # jadx-mcp
 
+[![CI & Release](https://github.com/arrteann/jadx-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/arrteann/jadx-mcp/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/arrteann/jadx-mcp)](https://github.com/arrteann/jadx-mcp/releases/latest)
+[![License](https://img.shields.io/github/license/arrteann/jadx-mcp)](LICENSE)
+
 An ultra-lightweight (~92 KB), zero-dependency **Model Context Protocol (MCP)** server plugin for [JADX](https://github.com/skylot/jadx).
 
 Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly inside JADX using a pure Java 11 `ServerSocket` HTTP/1.1 engine and JADX's own bundled `Gson` and `SLF4J` libraries. It does not require Python, Jetty, Javalin, Jackson, or `jdk.httpserver` (which is stripped from official JADX bundled JREs on Windows and macOS).
@@ -28,7 +32,13 @@ Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly 
 Requires Java 11+ (uses `options.release = 11`). When `../jadx` is present alongside this directory, Gradle automatically uses the composite build; otherwise configure a published `jadx-core` artifact.
 
 ```bash
-./gradlew test jar
+./gradlew check jar
+```
+
+To build and install directly into a sibling `../jadx/build/jadx` distribution for local testing:
+
+```bash
+./gradlew installToJadx
 ```
 
 The output plugin JAR is generated at:
@@ -80,3 +90,17 @@ If `jadx-mcp.token` is set, include `"headers": { "Authorization": "Bearer <your
 | **Fast Search & Sinks** | `search_symbols`, `search_strings`, `search_code`, `find_sink_call_sites` |
 | **Manifest & Resources** | `list_resources`, `read_resource`, `get_android_manifest`, `get_attack_surface` |
 | **GUI & Refactoring** | `get_current_context`, `navigate_to`, `rename_node` |
+
+---
+
+## Troubleshooting
+
+- **Port `8650` already in use:** If another JADX window or service is using `8650`, `jadx-mcp.auto-port-fallback` automatically binds to `8651`, `8652`, etc. Use **Plugins → Copy MCP Server Config** in `jadx-gui` to copy the active port.
+- **Unauthorized (`401`) responses:** Verify `jadx-mcp.token` in **Preferences → Plugins → JADX MCP Server** matches the `Authorization: Bearer <token>` header in your client config, or clear `jadx-mcp.token` for local unauthenticated access.
+- **`NoSuchMethodError` on startup/decompile:** Ensure you are running a JADX `dev`/nightly build (or release) that includes PR #3062 (`decompileWithMode`, `getSuperClass`, `getInterfaces`, `getShortId`).
+
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).

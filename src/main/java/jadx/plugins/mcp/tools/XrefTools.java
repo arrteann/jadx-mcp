@@ -19,7 +19,6 @@ import jadx.api.JavaNode;
 import jadx.api.plugins.input.data.ICodeReader;
 import jadx.api.plugins.input.data.IMethodRef;
 import jadx.core.dex.nodes.MethodNode;
-import jadx.core.utils.input.InsnDataUtils;
 import jadx.plugins.mcp.McpServerManager;
 import jadx.plugins.mcp.mcp.McpTool;
 import jadx.plugins.mcp.mcp.McpToolRegistry;

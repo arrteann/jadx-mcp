@@ -20,7 +20,6 @@ import jadx.api.ICodeInfo;
 import jadx.api.JadxDecompiler;
 import jadx.api.ResourceFile;
 import jadx.api.ResourceType;
-import jadx.api.ResourcesLoader;
 import jadx.core.xmlgen.ResContainer;
 import jadx.plugins.mcp.McpOptions;
 import jadx.plugins.mcp.McpServerManager;

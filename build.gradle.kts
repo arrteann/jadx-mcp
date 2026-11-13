@@ -1,9 +1,12 @@
 plugins {
 	java
+	id("com.diffplug.spotless") version "7.0.2"
 }
 
 group = "io.github.arrteann"
-version = "0.1.0-SNAPSHOT"
+if (version == Project.DEFAULT_VERSION) {
+	version = "0.1.0-SNAPSHOT"
+}
 
 repositories {
 	mavenCentral()
@@ -44,4 +47,25 @@ tasks.jar {
 			"Implementation-Version" to project.version,
 		)
 	}
+}
+
+spotless {
+	java {
+		target("src/**/*.java")
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+}
+
+tasks.register<Exec>("installToJadx") {
+	group = "jadx"
+	description = "Build the plugin JAR and install it into the sibling ../jadx build."
+	dependsOn(tasks.jar)
+	val isWindows = System.getProperty("os.name").lowercase().contains("win")
+	val jadxBin = rootProject.layout.projectDirectory.file(
+		if (isWindows) "../jadx/build/jadx/bin/jadx.bat" else "../jadx/build/jadx/bin/jadx"
+	).asFile
+	onlyIf { jadxBin.exists() }
+	commandLine(jadxBin.absolutePath, "plugins", "--install-jar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
 }
