@@ -34,9 +34,12 @@ Browse the [GitHub Wiki](https://github.com/arrteann/jadx-mcp/wiki) or read the 
 
 - [Installation & Client Setup](docs/Installation.md) — Plugin Manager, GitHub Releases, source build, and MCP client configs
 - [MCP Tools Reference (24 Tools)](docs/Tools-Reference.md) — Parameters, filters, pagination, and character budgets
+- [Real-World Scenarios & Examples](docs/Scenarios.md) — Live JSON outputs and reverse-engineering workflows
 - [Built-in Prompts & Resources](docs/Prompts-and-Resources.md) — Security audit prompts and `jadx://` URIs
 - [Architecture & Security](docs/Architecture-and-Security.md) — Zero-dependency HTTP engine, bytecode accuracy, and security model
 - [Troubleshooting](docs/Troubleshooting.md) — Port fallback, authentication, JADX version, and timeouts
+
+![JADX MCP Server Status Dialog](docs/images/mcp-status-dialog.png)
 
 ---
 
