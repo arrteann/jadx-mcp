@@ -1,6 +1,7 @@
 package jadx.plugins.mcp;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,9 @@ public final class JadxMcpPlugin implements JadxPlugin {
 	private final McpOptions options = new McpOptions();
 	private final McpServerManager serverManager = new McpServerManager(VERSION);
 	private boolean initialized = false;
+	private int startedPort = -1;
+	private boolean startedAutoFallback = true;
+	private String startedToken = "";
 
 	public JadxMcpPlugin() {
 		ProjectTools.register(serverManager.getRegistry(), serverManager);
@@ -91,13 +95,27 @@ public final class JadxMcpPlugin implements JadxPlugin {
 		if (!options.isEnabled()) {
 			serverManager.setLastError(null);
 			serverManager.stop();
+			startedPort = -1;
+			return;
+		}
+		int port = options.getPort();
+		boolean autoFallback = options.isAutoPortFallback();
+		String token = options.getToken();
+		if (serverManager.isRunning()
+				&& port == startedPort
+				&& autoFallback == startedAutoFallback
+				&& Objects.equals(token, startedToken)) {
 			return;
 		}
 		try {
-			serverManager.start(options.getPort(), options.isAutoPortFallback(), options.getToken());
+			serverManager.start(port, autoFallback, token);
+			startedPort = port;
+			startedAutoFallback = autoFallback;
+			startedToken = token;
 		} catch (IOException e) {
+			startedPort = -1;
 			serverManager.setLastError(e.getMessage());
-			LOG.error("Failed to start JADX MCP server on port {}: {}", options.getPort(), e.getMessage());
+			LOG.error("Failed to start JADX MCP server on port {}: {}", port, e.getMessage());
 		}
 	}
 }

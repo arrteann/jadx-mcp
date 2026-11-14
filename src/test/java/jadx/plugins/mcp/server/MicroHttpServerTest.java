@@ -47,6 +47,7 @@ class MicroHttpServerTest {
 					.build();
 			HttpResponse<String> initRes = client.send(initReq, HttpResponse.BodyHandlers.ofString());
 			assertThat(initRes.statusCode()).isEqualTo(200);
+			assertThat(initRes.headers().firstValue("Mcp-Session-Id")).isPresent();
 			JsonObject json = JsonParser.parseString(initRes.body()).getAsJsonObject();
 			assertThat(json.getAsJsonObject("result").get("protocolVersion").getAsString())
 					.isEqualTo(McpJsonRpcHandler.PROTOCOL_VERSION);

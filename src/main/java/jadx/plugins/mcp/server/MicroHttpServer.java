@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,7 @@ public final class MicroHttpServer implements Closeable {
 	private final HttpSecurityValidator security;
 	private final ServerSocket serverSocket;
 	private final ExecutorService executor;
+	private final String sessionId = UUID.randomUUID().toString();
 	private final AtomicBoolean running = new AtomicBoolean(false);
 	private final AtomicLong requestCount = new AtomicLong(0);
 	private Thread acceptThread;
@@ -138,10 +140,11 @@ public final class MicroHttpServer implements Closeable {
 			String body = new String(bodyBytes, StandardCharsets.UTF_8);
 
 			String rpcResponse = rpcHandler.handle(body);
+			Map<String, String> sessionHeader = Map.of("Mcp-Session-Id", sessionId);
 			if (rpcResponse == null) {
-				writeResponse(out, 202, "Accepted", "text/plain; charset=utf-8", "", null);
+				writeResponse(out, 202, "Accepted", "text/plain; charset=utf-8", "", sessionHeader);
 			} else {
-				writeResponse(out, 200, "OK", "application/json; charset=utf-8", rpcResponse, null);
+				writeResponse(out, 200, "OK", "application/json; charset=utf-8", rpcResponse, sessionHeader);
 			}
 		} catch (Exception e) {
 			if (running.get()) {

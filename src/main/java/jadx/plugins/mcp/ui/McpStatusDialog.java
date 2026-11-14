@@ -53,6 +53,8 @@ public final class McpStatusDialog extends JDialog {
 	private final JButton testButton = new JButton("Test Connection");
 	private final JButton copyButton = new JButton("Copy Config");
 	private final Timer refreshTimer;
+	private String pingBannerText;
+	private long pingBannerUntilMs;
 
 	private McpStatusDialog(JFrame owner, JadxGuiContext guiContext, McpServerManager manager, McpOptions options) {
 		super(owner, "JADX MCP Server", false);
@@ -207,6 +209,8 @@ public final class McpStatusDialog extends JDialog {
 			SwingUtilities.invokeLater(() -> {
 				testButton.setEnabled(true);
 				testButton.setText("Test Connection");
+				pingBannerText = resultText;
+				pingBannerUntilMs = System.currentTimeMillis() + 6000L;
 				statusValue.setText(resultText);
 				refreshStateCountOnly();
 			});
@@ -243,6 +247,7 @@ public final class McpStatusDialog extends JDialog {
 	}
 
 	private void toggleServer() {
+		pingBannerText = null;
 		if (manager.isRunning()) {
 			manager.setLastError(null);
 			manager.stop();
@@ -259,7 +264,12 @@ public final class McpStatusDialog extends JDialog {
 	private void refreshState() {
 		ClientFormat selectedFormat = (ClientFormat) formatSelector.getSelectedItem();
 		McpStatusSnapshot snapshot = McpStatusSnapshot.capture(manager, options, selectedFormat);
-		statusValue.setText(snapshot.getStatusText());
+		if (pingBannerText != null && System.currentTimeMillis() < pingBannerUntilMs) {
+			statusValue.setText(pingBannerText);
+		} else {
+			pingBannerText = null;
+			statusValue.setText(snapshot.getStatusText());
+		}
 		endpointValue.setText(snapshot.getEndpointUrl());
 		authValue.setText(snapshot.getAuthText());
 		toolsValue.setText(snapshot.getToolCount() + " registered");

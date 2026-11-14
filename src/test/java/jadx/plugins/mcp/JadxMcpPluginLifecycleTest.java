@@ -66,6 +66,13 @@ class JadxMcpPluginLifecycleTest {
 			JsonObject body = JsonParser.parseString(res.body()).getAsJsonObject();
 			assertThat(body.getAsJsonObject("result").getAsJsonObject("serverInfo").get("name").getAsString())
 					.isEqualTo(JadxMcpPlugin.PLUGIN_ID);
+
+			int portBefore = mcpPlugin.getServerManager().getActivePort();
+			mcpPlugin.getOptions().setOptions(Map.of(
+					McpOptions.OPT_PORT, "0",
+					McpOptions.OPT_MAX_CHARS, "16000"));
+			assertThat(mcpPlugin.getOptions().getMaxOutputChars()).isEqualTo(16000);
+			assertThat(mcpPlugin.getServerManager().getActivePort()).isEqualTo(portBefore);
 		}
 		assertThat(mcpPlugin.getServerManager().isRunning()).isFalse();
 	}
