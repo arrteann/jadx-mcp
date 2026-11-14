@@ -1,6 +1,6 @@
 # Real-World Scenarios & Live Examples
 
-This guide walks through practical reverse-engineering workflows with `jadx-mcp`, using **actual JSON outputs** captured from `jadx-mcp` running against JADX's `small.apk` sample.
+This guide shows complete end-to-end interactions with `jadx-mcp`: **the prompt you give your AI client**, **the MCP tools called**, **actual JSON outputs** captured from `jadx-mcp` running on JADX's `small.apk`, and **the model's final answer**.
 
 ---
 
@@ -26,9 +26,13 @@ flowchart LR
 
 ## Scenario 1: Initial Triage & Attack Surface Audit
 
-Start by checking the loaded project size and inspecting `AndroidManifest.xml` for exported components and security flags.
+### User Prompt
 
-### 1. `get_project_info`
+> "Give me a quick overview of the loaded APK, check its manifest security flags and exported components, and summarize the main app package without decompiling everything."
+
+### Tool Calls & Live Responses
+
+#### 1. `get_project_info` (`{}`)
 
 ```json
 {
@@ -42,7 +46,7 @@ Start by checking the loaded project size and inspecting `AndroidManifest.xml` f
 }
 ```
 
-### 2. `get_attack_surface`
+#### 2. `get_attack_surface` (`{}`)
 
 ```json
 {
@@ -64,9 +68,7 @@ Start by checking the loaded project size and inspecting `AndroidManifest.xml` f
 }
 ```
 
-### 3. `get_package_summary` (`packagePrefix: "io.github.skylot.android.smallapp"`)
-
-Summarize a package's classes, method/field counts, and subpackages without triggering decompilation:
+#### 3. `get_package_summary` (`{"packagePrefix": "io.github.skylot.android.smallapp"}`)
 
 ```json
 {
@@ -95,13 +97,27 @@ Summarize a package's classes, method/field counts, and subpackages without trig
 }
 ```
 
+### Model Response
+
+> **Project Summary (`small.apk`)**
+> - **Scale:** 8 classes, 2 methods, 9 fields, 8 resources, and no native `.so` libraries.
+> - **Main Package (`io.github.skylot.android.smallapp`):** Contains 2 classes (`MainActivity` extending `android.app.Activity` with 2 methods, and `R`).
+> - **Manifest & Attack Surface:**
+>   - `android:debuggable="true"` and `android:allowBackup="true"` are both enabled (should be disabled for release builds).
+>   - `usesCleartextTraffic` is `false` and no dangerous permissions are declared.
+>   - 1 unprotected exported component: `io.github.skylot.android.smallapp.MainActivity` (launcher activity).
+
 ---
 
 ## Scenario 2: String Search → Outline → Call Graph → Method Source
 
-Instead of decompiling entire classes, locate constant strings in raw bytecode first, inspect the class outline, verify callees from bytecode, and decompile only the target method.
+### User Prompt
 
-### 1. `search_strings` (`query: "Hello"`)
+> "Find where the string `"Hello"` is used in this APK, inspect the enclosing class structure, list what that method calls, and show me only that method's decompiled Java code."
+
+### Tool Calls & Live Responses
+
+#### 1. `search_strings` (`{"query": "Hello", "limit": 5}`)
 
 ```json
 {
@@ -122,7 +138,7 @@ Instead of decompiling entire classes, locate constant strings in raw bytecode f
 }
 ```
 
-### 2. `get_class_outline` (`className: "io.github.skylot.android.smallapp.MainActivity"`)
+#### 2. `get_class_outline` (`{"className": "io.github.skylot.android.smallapp.MainActivity"}`)
 
 ```json
 {
@@ -149,7 +165,7 @@ Instead of decompiling entire classes, locate constant strings in raw bytecode f
 }
 ```
 
-### 3. `get_callees` (`MainActivity.onCreate`)
+#### 3. `get_callees` (`{"className": "io.github.skylot.android.smallapp.MainActivity", "methodName": "onCreate"}`)
 
 ```json
 {
@@ -179,7 +195,7 @@ Instead of decompiling entire classes, locate constant strings in raw bytecode f
 }
 ```
 
-### 4. `get_method_source` (`MainActivity.onCreate`)
+#### 4. `get_method_source` (`{"className": "io.github.skylot.android.smallapp.MainActivity", "methodName": "onCreate"}`)
 
 ```json
 {
@@ -194,13 +210,24 @@ Instead of decompiling entire classes, locate constant strings in raw bytecode f
 }
 ```
 
+### Model Response
+
+> The string `"Hello"` appears in `io.github.skylot.android.smallapp.MainActivity.onCreate(Bundle)`:
+> - **Class structure:** `MainActivity extends android.app.Activity` with two methods (`<init>()` and `onCreate(Bundle)`).
+> - **Bytecode callees:** Calls `Activity.onCreate`, `Activity.setContentView`, and `Log.i`.
+> - **Decompiled behavior:** Initializes the activity, inflates `R.layout.activity_main`, and logs `"Hello"` under the tag `"SmallApp"`.
+
 ---
 
-## Scenario 3: Resource Search (`search_resources`)
+## Scenario 3: Searching Text Resources
 
-Search across decoded XML, manifest, JSON, HTML, and properties files without reading every resource individually:
+### User Prompt
 
-### `search_resources` (`query: "package"`)
+> "Search across all decoded XML, manifest, and text resources for `"package"` so I can see which files define or reference it."
+
+### Tool Call & Live Response
+
+#### `search_resources` (`{"query": "package", "limit": 5}`)
 
 ```json
 {
@@ -219,4 +246,29 @@ Search across decoded XML, manifest, JSON, HTML, and properties files without re
   "nextOffset": -1,
   "timedOut": false
 }
+```
+
+### Model Response
+
+> Found 1 match across text resources:
+> - `AndroidManifest.xml` (line 7): `package="io.github.skylot.android.smallapp"`
+
+---
+
+## Scenario 4: Built-in Security Audit Prompt
+
+MCP clients that support `prompts/list` and `prompts/get` can invoke built-in workflows directly (for example `/security_audit` with optional `packagePrefix`).
+
+### User Prompt (via Built-in `security_audit` Prompt)
+
+> `prompts/get` → `security_audit` (`packagePrefix: "com.example.auth"`)
+
+### Prompt Expansion Sent to the Model
+
+```text
+Perform a structured security audit of the loaded APK:
+1. Call get_project_info and get_attack_surface to inspect permissions, debuggable/cleartext flags, and unprotected exported components.
+2. Call find_sink_call_sites (category='all', excludeLibraries=true, excludeGenerated=true).
+3. Call list_classes (Focus on packagePrefix 'com.example.auth' with excludeLibraries=true and excludeGenerated=true.) and inspect high-risk entry points with get_class_outline / get_method_source.
+4. Summarize concrete findings with class/method locations and severity.
 ```
