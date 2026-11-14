@@ -7,21 +7,27 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import jadx.api.plugins.gui.JadxGuiContext;
 import jadx.plugins.mcp.McpOptions;
 import jadx.plugins.mcp.McpServerManager;
+import jadx.plugins.mcp.tools.GuiTools.ClientFormat;
 
 /**
  * Lightweight Swing dialog displaying live MCP server status, request metrics, and client config.
@@ -40,8 +46,10 @@ public final class McpStatusDialog extends JDialog {
 	private final JLabel toolsValue = new JLabel();
 	private final JLabel requestsValue = new JLabel();
 	private final JLabel uptimeValue = new JLabel();
+	private final JComboBox<ClientFormat> formatSelector = new JComboBox<>(ClientFormat.values());
 	private final JTextArea configArea = new JTextArea(8, 44);
 	private final JButton toggleButton = new JButton();
+	private final JButton testButton = new JButton("Test Connection");
 	private final JButton copyButton = new JButton("Copy Config");
 	private final Timer refreshTimer;
 
@@ -125,11 +133,17 @@ public final class McpStatusDialog extends JDialog {
 	}
 
 	private JPanel buildConfigPanel() {
-		JPanel panel = new JPanel(new BorderLayout(4, 4));
-		panel.setBorder(BorderFactory.createTitledBorder("Client Configuration (mcpServers)"));
+		JPanel panel = new JPanel(new BorderLayout(6, 6));
+		panel.setBorder(BorderFactory.createTitledBorder("Client Configuration"));
+
+		JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+		topBar.add(new JLabel("Client Format:"));
+		formatSelector.addActionListener(e -> refreshState());
+		topBar.add(formatSelector);
 
 		configArea.setEditable(false);
 		configArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+		panel.add(topBar, BorderLayout.NORTH);
 		panel.add(new JScrollPane(configArea), BorderLayout.CENTER);
 		return panel;
 	}
@@ -145,6 +159,7 @@ public final class McpStatusDialog extends JDialog {
 			reset.start();
 		});
 
+		testButton.addActionListener(e -> runConnectionTest());
 		toggleButton.addActionListener(e -> toggleServer());
 
 		JButton refreshButton = new JButton("Refresh");
@@ -154,10 +169,60 @@ public final class McpStatusDialog extends JDialog {
 		closeButton.addActionListener(e -> dispose());
 
 		panel.add(toggleButton);
+		panel.add(testButton);
 		panel.add(copyButton);
 		panel.add(refreshButton);
 		panel.add(closeButton);
 		return panel;
+	}
+
+	private void runConnectionTest() {
+		String activeUrl = manager.getActiveUrl();
+		if (activeUrl == null) {
+			statusValue.setText("Stopped (start server first)");
+			return;
+		}
+		testButton.setEnabled(false);
+		testButton.setText("Testing...");
+		String token = options.getToken();
+		Thread worker = new Thread(() -> {
+			String resultText = pingEndpoint(activeUrl, token);
+			SwingUtilities.invokeLater(() -> {
+				testButton.setEnabled(true);
+				testButton.setText("Test Connection");
+				statusValue.setText(resultText);
+				refreshStateCountOnly();
+			});
+		}, "jadx-mcp-ping-test");
+		worker.setDaemon(true);
+		worker.start();
+	}
+
+	private static String pingEndpoint(String endpointUrl, String token) {
+		long startNs = System.nanoTime();
+		try {
+			HttpURLConnection conn = (HttpURLConnection) new URL(endpointUrl).openConnection();
+			conn.setConnectTimeout(3000);
+			conn.setReadTimeout(3000);
+			conn.setRequestMethod("POST");
+			conn.setDoOutput(true);
+			conn.setRequestProperty("Content-Type", "application/json");
+			if (token != null && !token.trim().isEmpty()) {
+				conn.setRequestProperty("Authorization", "Bearer " + token.trim());
+			}
+			byte[] payload = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}".getBytes(StandardCharsets.UTF_8);
+			conn.getOutputStream().write(payload);
+			int code = conn.getResponseCode();
+			conn.disconnect();
+			long ms = Math.max(1L, (System.nanoTime() - startNs) / 1_000_000L);
+			return code == 200 ? "Ping OK (" + ms + " ms)" : "Ping HTTP " + code;
+		} catch (Exception e) {
+			return "Ping failed: " + e.getMessage();
+		}
+	}
+
+	private void refreshStateCountOnly() {
+		requestsValue.setText(Long.toString(manager.getRequestCount()));
 	}
 
 	private void toggleServer() {
@@ -175,7 +240,8 @@ public final class McpStatusDialog extends JDialog {
 	}
 
 	private void refreshState() {
-		McpStatusSnapshot snapshot = McpStatusSnapshot.capture(manager, options);
+		ClientFormat selectedFormat = (ClientFormat) formatSelector.getSelectedItem();
+		McpStatusSnapshot snapshot = McpStatusSnapshot.capture(manager, options, selectedFormat);
 		statusValue.setText(snapshot.getStatusText());
 		endpointValue.setText(snapshot.getEndpointUrl());
 		authValue.setText(snapshot.getAuthText());

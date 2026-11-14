@@ -5,6 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -176,7 +178,9 @@ public final class SearchTools {
 		@Override
 		public JsonObject getInputSchema() {
 			JsonObject props = new JsonObject();
-			props.add("query", ToolSupport.prop("string", "Case-insensitive substring to match in string constants"));
+			props.add("query", ToolSupport.prop("string", "Substring or regex pattern to match in string constants"));
+			props.add("regex", ToolSupport.prop("boolean", "Treat query as a case-insensitive regular expression (default false)"));
+			ToolSupport.addClassFilterProps(props);
 			props.add("timeLimitMs", ToolSupport.prop("integer", "Time budget in milliseconds"));
 			props.add("offset", ToolSupport.prop("integer", "Pagination offset"));
 			props.add("limit", ToolSupport.prop("integer", "Page size"));
@@ -186,7 +190,10 @@ public final class SearchTools {
 		@Override
 		public JsonElement execute(JsonObject arguments) {
 			JadxDecompiler decompiler = ToolSupport.requireDecompiler(manager);
-			String query = ToolSupport.getString(arguments, "query", "").toLowerCase(Locale.ROOT);
+			String rawQuery = ToolSupport.getString(arguments, "query", "");
+			boolean useRegex = ToolSupport.getBoolean(arguments, "regex", false);
+			Pattern pattern = compileOptionalPattern(rawQuery, useRegex);
+			String lowerQuery = rawQuery.toLowerCase(Locale.ROOT);
 			int timeLimitMs = ToolSupport.getInt(arguments, "timeLimitMs", DEFAULT_TIME_LIMIT_MS);
 			int offset = ToolSupport.getInt(arguments, "offset", 0);
 			int limit = ToolSupport.getInt(arguments, "limit", PaginationHelper.DEFAULT_LIMIT);
@@ -199,6 +206,9 @@ public final class SearchTools {
 					timedOut = true;
 					break;
 				}
+				if (ToolSupport.shouldSkipClass(cls.getFullName(), arguments)) {
+					continue;
+				}
 				for (JavaMethod mth : cls.getMethods()) {
 					if (mth.getMethodNode().isNoCode()) {
 						continue;
@@ -209,7 +219,7 @@ public final class SearchTools {
 					}
 					reader.visitInstructions(insn -> {
 						String val = ToolSupport.readStringRef(insn);
-						if (val != null && val.toLowerCase(Locale.ROOT).contains(query)) {
+						if (val != null && matchesString(val, lowerQuery, pattern)) {
 							JsonObject item = new JsonObject();
 							item.addProperty("value", val);
 							item.addProperty("className", cls.getFullName());
@@ -221,6 +231,21 @@ public final class SearchTools {
 				}
 			}
 			return buildPagedObject(matches, offset, limit, timedOut);
+		}
+
+		private static Pattern compileOptionalPattern(String rawQuery, boolean useRegex) {
+			if (!useRegex) {
+				return null;
+			}
+			try {
+				return Pattern.compile(rawQuery, Pattern.CASE_INSENSITIVE);
+			} catch (PatternSyntaxException e) {
+				throw new IllegalArgumentException("Invalid regex pattern: " + e.getMessage());
+			}
+		}
+
+		private static boolean matchesString(String val, String lowerQuery, Pattern pattern) {
+			return pattern != null ? pattern.matcher(val).find() : val.toLowerCase(Locale.ROOT).contains(lowerQuery);
 		}
 	}
 

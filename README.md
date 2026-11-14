@@ -13,7 +13,8 @@ Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly 
 ## Features
 
 - **Single-step setup:** Drop the plugin JAR into JADX and point any MCP client to `http://127.0.0.1:8650/mcp` (or use **Plugins → Copy MCP Server Config**).
-- **20 focused MCP tools** with pagination, line slicing, character budgets, and automatic outline fallback on large classes.
+- **21 focused MCP tools** with pagination, line slicing, character budgets, library noise filters, and automatic outline fallback on large classes.
+- **MCP `prompts` and `resources`:** Built-in reverse-engineering prompts (`security_audit`, `analyze_webview_deeplinks`, `analyze_crypto_secrets`, `explain_current_class`) and direct resources (`jadx://project/info`, `jadx://project/manifest`, `jadx://gui/current-context`).
 - **Raw bytecode accuracy:** `get_callees`, `get_xrefs`, `search_strings`, and `find_sink_call_sites` read raw bytecode instructions (`ICodeReader`) so call edges are not lost to decompiler inlining.
 - **Security-first local server:** Binds strictly to `127.0.0.1`, validates `Host` and `Origin` headers against DNS rebinding, supports optional constant-time `Bearer` token authentication, and disables XXE when parsing `AndroidManifest.xml`.
 - **Multi-window friendly:** Automatically falls back to the next free port (`8651`, `8652`, ...) when multiple JADX windows are open.
@@ -81,11 +82,11 @@ If `jadx-mcp.token` is set, include `"headers": { "Authorization": "Bearer <your
 
 ---
 
-## Available MCP Tools (20)
+## Available MCP Tools (21)
 
 | Category | Tools |
 | :--- | :--- |
-| **Project & Decompilation** | `get_project_info`, `list_classes`, `get_class_outline`, `get_class_source`, `get_method_source` |
+| **Project & Decompilation** | `get_project_info`, `list_classes`, `get_class_outline`, `get_class_source`, `get_method_source`, `get_method_smali` |
 | **Call Graph & Hierarchy** | `get_callees`, `get_xrefs`, `get_type_hierarchy`, `get_overrides` |
 | **Fast Search & Sinks** | `search_symbols`, `search_strings`, `search_code`, `find_sink_call_sites` |
 | **Manifest & Resources** | `list_resources`, `read_resource`, `get_android_manifest`, `get_attack_surface` |

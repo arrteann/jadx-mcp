@@ -53,8 +53,31 @@ public final class GuiTools {
 		});
 	}
 
+	public enum ClientFormat {
+		MCP_SERVERS("Cursor / Claude / Antigravity"),
+		VSCODE_SERVERS("VS Code (.vscode/mcp.json)");
+
+		private final String label;
+
+		ClientFormat(String label) {
+			this.label = label;
+		}
+
+		@Override
+		public String toString() {
+			return label;
+		}
+	}
+
 	public static String buildAgentConfigJson(String url, String token) {
+		return buildClientConfigJson(url, token, ClientFormat.MCP_SERVERS);
+	}
+
+	public static String buildClientConfigJson(String url, String token, ClientFormat format) {
 		JsonObject server = new JsonObject();
+		if (format == ClientFormat.VSCODE_SERVERS) {
+			server.addProperty("type", "http");
+		}
 		server.addProperty("url", url);
 		if (token != null && !token.trim().isEmpty()) {
 			JsonObject headers = new JsonObject();
@@ -65,7 +88,7 @@ public final class GuiTools {
 		servers.add(JadxMcpPlugin.PLUGIN_ID, server);
 
 		JsonObject root = new JsonObject();
-		root.add("mcpServers", servers);
+		root.add(format == ClientFormat.VSCODE_SERVERS ? "servers" : "mcpServers", servers);
 		return PRETTY_GSON.toJson(root);
 	}
 

@@ -18,11 +18,24 @@ public final class McpJsonRpcHandler {
 
 	private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 	private final McpToolRegistry registry;
+	private final McpPromptRegistry promptRegistry;
+	private final McpResourceRegistry resourceRegistry;
 	private final String serverName;
 	private final String serverVersion;
 
 	public McpJsonRpcHandler(McpToolRegistry registry, String serverName, String serverVersion) {
+		this(registry, new McpPromptRegistry(), new McpResourceRegistry(), serverName, serverVersion);
+	}
+
+	public McpJsonRpcHandler(
+			McpToolRegistry registry,
+			McpPromptRegistry promptRegistry,
+			McpResourceRegistry resourceRegistry,
+			String serverName,
+			String serverVersion) {
 		this.registry = registry;
+		this.promptRegistry = promptRegistry == null ? new McpPromptRegistry() : promptRegistry;
+		this.resourceRegistry = resourceRegistry == null ? new McpResourceRegistry() : resourceRegistry;
 		this.serverName = serverName;
 		this.serverVersion = serverVersion;
 	}
@@ -114,6 +127,14 @@ public final class McpJsonRpcHandler {
 				return handleToolsList();
 			case "tools/call":
 				return handleToolsCall(params);
+			case "prompts/list":
+				return handlePromptsList();
+			case "prompts/get":
+				return handlePromptsGet(params);
+			case "resources/list":
+				return handleResourcesList();
+			case "resources/read":
+				return handleResourcesRead(params);
 			default:
 				throw new McpException(McpException.METHOD_NOT_FOUND, "Method not found: " + method);
 		}
@@ -122,9 +143,16 @@ public final class McpJsonRpcHandler {
 	private JsonObject handleInitialize() {
 		JsonObject toolsCap = new JsonObject();
 		toolsCap.addProperty("listChanged", false);
+		JsonObject promptsCap = new JsonObject();
+		promptsCap.addProperty("listChanged", false);
+		JsonObject resourcesCap = new JsonObject();
+		resourcesCap.addProperty("subscribe", false);
+		resourcesCap.addProperty("listChanged", false);
 
 		JsonObject capabilities = new JsonObject();
 		capabilities.add("tools", toolsCap);
+		capabilities.add("prompts", promptsCap);
+		capabilities.add("resources", resourcesCap);
 
 		JsonObject serverInfo = new JsonObject();
 		serverInfo.addProperty("name", serverName);
@@ -178,6 +206,89 @@ public final class McpJsonRpcHandler {
 			String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
 			return buildToolResponse("Error executing tool '" + toolName + "': " + msg, true);
 		}
+	}
+
+	private JsonObject handlePromptsList() {
+		JsonArray arr = new JsonArray();
+		for (McpPromptRegistry.McpPrompt prompt : promptRegistry.listAll()) {
+			JsonObject item = new JsonObject();
+			item.addProperty("name", prompt.getName());
+			item.addProperty("description", prompt.getDescription());
+			item.add("arguments", prompt.getArguments());
+			arr.add(item);
+		}
+		JsonObject result = new JsonObject();
+		result.add("prompts", arr);
+		return result;
+	}
+
+	private JsonObject handlePromptsGet(JsonObject params) {
+		String name = requireStringParam(params, "name", "Missing prompt 'name'");
+		McpPromptRegistry.McpPrompt prompt = promptRegistry.get(name);
+		if (prompt == null) {
+			throw new McpException(McpException.INVALID_PARAMS, "Unknown prompt: " + name);
+		}
+		JsonObject arguments = params.has("arguments") && params.get("arguments").isJsonObject()
+				? params.getAsJsonObject("arguments")
+				: new JsonObject();
+
+		JsonObject textContent = new JsonObject();
+		textContent.addProperty("type", "text");
+		textContent.addProperty("text", prompt.render(arguments));
+
+		JsonObject message = new JsonObject();
+		message.addProperty("role", "user");
+		message.add("content", textContent);
+
+		JsonArray messages = new JsonArray();
+		messages.add(message);
+
+		JsonObject result = new JsonObject();
+		result.addProperty("description", prompt.getDescription());
+		result.add("messages", messages);
+		return result;
+	}
+
+	private JsonObject handleResourcesList() {
+		JsonArray arr = new JsonArray();
+		for (McpResourceRegistry.McpResource res : resourceRegistry.listAll()) {
+			JsonObject item = new JsonObject();
+			item.addProperty("uri", res.getUri());
+			item.addProperty("name", res.getName());
+			item.addProperty("description", res.getDescription());
+			item.addProperty("mimeType", res.getMimeType());
+			arr.add(item);
+		}
+		JsonObject result = new JsonObject();
+		result.add("resources", arr);
+		return result;
+	}
+
+	private JsonObject handleResourcesRead(JsonObject params) {
+		String uri = requireStringParam(params, "uri", "Missing resource 'uri'");
+		McpResourceRegistry.McpResource res = resourceRegistry.get(uri);
+		if (res == null) {
+			throw new McpException(McpException.INVALID_PARAMS, "Unknown resource: " + uri);
+		}
+		JsonObject content = new JsonObject();
+		content.addProperty("uri", res.getUri());
+		content.addProperty("mimeType", res.getMimeType());
+		content.addProperty("text", res.read());
+
+		JsonArray contents = new JsonArray();
+		contents.add(content);
+
+		JsonObject result = new JsonObject();
+		result.add("contents", contents);
+		return result;
+	}
+
+	private static String requireStringParam(JsonObject params, String key, String errorMessage) {
+		JsonElement el = params.get(key);
+		if (el == null || !el.isJsonPrimitive() || !el.getAsJsonPrimitive().isString()) {
+			throw new McpException(McpException.INVALID_PARAMS, errorMessage);
+		}
+		return el.getAsString();
 	}
 
 	private static JsonObject buildToolResponse(String text, boolean isError) {

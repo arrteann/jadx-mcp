@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import jadx.api.JadxDecompiler;
 import jadx.api.plugins.gui.JadxGuiContext;
 import jadx.plugins.mcp.mcp.McpJsonRpcHandler;
+import jadx.plugins.mcp.mcp.McpPromptRegistry;
+import jadx.plugins.mcp.mcp.McpResourceRegistry;
 import jadx.plugins.mcp.mcp.McpToolRegistry;
 import jadx.plugins.mcp.server.HttpSecurityValidator;
 import jadx.plugins.mcp.server.MicroHttpServer;
@@ -24,6 +26,8 @@ public final class McpServerManager {
 	private static final int MAX_PORT_ATTEMPTS = 20;
 
 	private final McpToolRegistry registry = new McpToolRegistry();
+	private final McpPromptRegistry promptRegistry = new McpPromptRegistry();
+	private final McpResourceRegistry resourceRegistry = new McpResourceRegistry();
 	private final AtomicReference<JadxDecompiler> decompilerRef = new AtomicReference<>();
 	private final AtomicReference<JadxGuiContext> guiContextRef = new AtomicReference<>();
 	private final String serverVersion;
@@ -38,6 +42,14 @@ public final class McpServerManager {
 
 	public McpToolRegistry getRegistry() {
 		return registry;
+	}
+
+	public McpPromptRegistry getPromptRegistry() {
+		return promptRegistry;
+	}
+
+	public McpResourceRegistry getResourceRegistry() {
+		return resourceRegistry;
 	}
 
 	public void setDecompiler(JadxDecompiler decompiler) {
@@ -58,7 +70,8 @@ public final class McpServerManager {
 
 	public synchronized void start(int preferredPort, boolean autoFallback, String token) throws IOException {
 		stopServerOnly();
-		McpJsonRpcHandler rpc = new McpJsonRpcHandler(registry, JadxMcpPlugin.PLUGIN_ID, serverVersion);
+		McpJsonRpcHandler rpc = new McpJsonRpcHandler(
+				registry, promptRegistry, resourceRegistry, JadxMcpPlugin.PLUGIN_ID, serverVersion);
 		HttpSecurityValidator security = new HttpSecurityValidator(token);
 
 		MicroHttpServer created = bindWithFallback(preferredPort, autoFallback, rpc, security);

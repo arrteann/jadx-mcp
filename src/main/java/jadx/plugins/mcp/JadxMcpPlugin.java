@@ -12,6 +12,7 @@ import jadx.api.plugins.JadxPluginInfoBuilder;
 import jadx.plugins.mcp.tools.DecompileTools;
 import jadx.plugins.mcp.tools.GuiTools;
 import jadx.plugins.mcp.tools.HierarchyTools;
+import jadx.plugins.mcp.tools.McpBuiltins;
 import jadx.plugins.mcp.tools.ProjectTools;
 import jadx.plugins.mcp.tools.ResourceTools;
 import jadx.plugins.mcp.tools.SearchTools;
@@ -45,6 +46,7 @@ public final class JadxMcpPlugin implements JadxPlugin {
 		SearchTools.register(serverManager.getRegistry(), serverManager);
 		ResourceTools.register(serverManager.getRegistry(), serverManager, options);
 		GuiTools.register(serverManager.getRegistry(), serverManager);
+		McpBuiltins.register(serverManager);
 	}
 
 	@Override

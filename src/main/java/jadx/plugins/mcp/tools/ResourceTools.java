@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -245,6 +246,24 @@ public final class ResourceTools {
 	}
 
 	private static final class GetAttackSurfaceTool implements McpTool {
+		private static final Set<String> DANGEROUS_PERMISSIONS = Set.of(
+				"android.permission.READ_SMS",
+				"android.permission.RECEIVE_SMS",
+				"android.permission.SEND_SMS",
+				"android.permission.RECORD_AUDIO",
+				"android.permission.CAMERA",
+				"android.permission.ACCESS_FINE_LOCATION",
+				"android.permission.ACCESS_COARSE_LOCATION",
+				"android.permission.READ_CONTACTS",
+				"android.permission.WRITE_EXTERNAL_STORAGE",
+				"android.permission.READ_EXTERNAL_STORAGE",
+				"android.permission.MANAGE_EXTERNAL_STORAGE",
+				"android.permission.REQUEST_INSTALL_PACKAGES",
+				"android.permission.SYSTEM_ALERT_WINDOW",
+				"android.permission.READ_CALL_LOG",
+				"android.permission.PROCESS_OUTGOING_CALLS",
+				"android.permission.READ_PHONE_STATE");
+
 		private final McpServerManager manager;
 
 		private GetAttackSurfaceTool(McpServerManager manager) {
@@ -291,21 +310,33 @@ public final class ResourceTools {
 			out.addProperty("packageName", root.getAttribute("package"));
 
 			JsonArray permissions = new JsonArray();
+			JsonArray dangerousPermissions = new JsonArray();
 			NodeList permNodes = root.getElementsByTagName("uses-permission");
 			for (int i = 0; i < permNodes.getLength(); i++) {
 				Element el = (Element) permNodes.item(i);
 				String name = androidAttr(el, "name");
 				if (!name.isEmpty()) {
 					permissions.add(name);
+					if (DANGEROUS_PERMISSIONS.contains(name)) {
+						dangerousPermissions.add(name);
+					}
 				}
 			}
 			out.add("permissions", permissions);
+			out.add("dangerousPermissions", dangerousPermissions);
 
 			Element appEl = firstChildElement(root, "application");
 			out.addProperty("debuggable", appEl != null && "true".equalsIgnoreCase(androidAttr(appEl, "debuggable")));
 			out.addProperty("allowBackup", appEl == null || !"false".equalsIgnoreCase(androidAttr(appEl, "allowBackup")));
+			out.addProperty("usesCleartextTraffic",
+					appEl != null && "true".equalsIgnoreCase(androidAttr(appEl, "usesCleartextTraffic")));
+			String netSec = appEl == null ? "" : androidAttr(appEl, "networkSecurityConfig");
+			if (!netSec.isEmpty()) {
+				out.addProperty("networkSecurityConfig", netSec);
+			}
 
 			JsonArray exported = new JsonArray();
+			int unprotectedCount = 0;
 			if (appEl != null) {
 				String[] tags = {"activity", "activity-alias", "service", "receiver", "provider"};
 				for (String tag : tags) {
@@ -314,12 +345,16 @@ public final class ResourceTools {
 						Element comp = (Element) nodes.item(i);
 						JsonObject parsed = parseExportedComponent(tag, comp);
 						if (parsed != null) {
+							if (!parsed.get("protected").getAsBoolean()) {
+								unprotectedCount++;
+							}
 							exported.add(parsed);
 						}
 					}
 				}
 			}
 			out.add("exportedComponents", exported);
+			out.addProperty("unprotectedExportedCount", unprotectedCount);
 			return out;
 		}
 
@@ -337,6 +372,7 @@ public final class ResourceTools {
 			obj.addProperty("type", type);
 			obj.addProperty("name", androidAttr(comp, "name"));
 			String perm = androidAttr(comp, "permission");
+			obj.addProperty("protected", !perm.isEmpty());
 			if (!perm.isEmpty()) {
 				obj.addProperty("permission", perm);
 			}

@@ -6,6 +6,7 @@ import java.time.Instant;
 import jadx.plugins.mcp.McpOptions;
 import jadx.plugins.mcp.McpServerManager;
 import jadx.plugins.mcp.tools.GuiTools;
+import jadx.plugins.mcp.tools.GuiTools.ClientFormat;
 
 /**
  * Immutable snapshot of the embedded MCP server status and client configuration.
@@ -44,10 +45,18 @@ public final class McpStatusSnapshot {
 	}
 
 	public static McpStatusSnapshot capture(McpServerManager manager, McpOptions options) {
-		return capture(manager, options, Instant.now());
+		return capture(manager, options, ClientFormat.MCP_SERVERS, Instant.now());
+	}
+
+	public static McpStatusSnapshot capture(McpServerManager manager, McpOptions options, ClientFormat format) {
+		return capture(manager, options, format, Instant.now());
 	}
 
 	static McpStatusSnapshot capture(McpServerManager manager, McpOptions options, Instant now) {
+		return capture(manager, options, ClientFormat.MCP_SERVERS, now);
+	}
+
+	static McpStatusSnapshot capture(McpServerManager manager, McpOptions options, ClientFormat format, Instant now) {
 		boolean running = manager.isRunning();
 		String lastError = manager.getLastError();
 		String activeUrl = manager.getActiveUrl();
@@ -68,7 +77,8 @@ public final class McpStatusSnapshot {
 				: "Disabled (127.0.0.1 loopback only)";
 
 		String uptimeText = formatUptime(manager.getStartedAt(), now);
-		String configJson = GuiTools.buildAgentConfigJson(configUrl, token);
+		ClientFormat resolvedFormat = format == null ? ClientFormat.MCP_SERVERS : format;
+		String configJson = GuiTools.buildClientConfigJson(configUrl, token, resolvedFormat);
 
 		return new McpStatusSnapshot(
 				running,

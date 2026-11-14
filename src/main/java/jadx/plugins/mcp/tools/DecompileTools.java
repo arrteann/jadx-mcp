@@ -33,7 +33,8 @@ public final class DecompileTools {
 	public static void register(McpToolRegistry registry, McpServerManager manager, McpOptions options) {
 		registry.register(new GetClassOutlineTool(manager));
 		registry.register(new GetClassSourceTool(manager, options));
-		registry.register(new GetMethodSourceTool(manager, options));
+		registry.register(new GetMethodCodeTool(manager, options, false));
+		registry.register(new GetMethodCodeTool(manager, options, true));
 	}
 
 	static JsonObject buildOutline(JavaClass cls) {
@@ -198,23 +199,27 @@ public final class DecompileTools {
 		}
 	}
 
-	private static final class GetMethodSourceTool implements McpTool {
+	private static final class GetMethodCodeTool implements McpTool {
 		private final McpServerManager manager;
 		private final McpOptions options;
+		private final boolean smaliMode;
 
-		private GetMethodSourceTool(McpServerManager manager, McpOptions options) {
+		private GetMethodCodeTool(McpServerManager manager, McpOptions options, boolean smaliMode) {
 			this.manager = manager;
 			this.options = options;
+			this.smaliMode = smaliMode;
 		}
 
 		@Override
 		public String getName() {
-			return "get_method_source";
+			return smaliMode ? "get_method_smali" : "get_method_source";
 		}
 
 		@Override
 		public String getDescription() {
-			return "Return source code for a single method, supporting shortId to disambiguate overloads.";
+			return smaliMode
+					? "Return Smali disassembly for a single method, supporting shortId to disambiguate overloads."
+					: "Return source code for a single method, supporting shortId to disambiguate overloads.";
 		}
 
 		@Override
@@ -252,16 +257,46 @@ public final class DecompileTools {
 			}
 
 			JavaMethod target = matches.get(0);
-			LineSliceResult slice = PaginationHelper.sliceLines(target.getCodeStr(), null, null, maxChars);
+			String code = smaliMode ? extractMethodSmali(cls.getSmali(), target.getShortId()) : target.getCodeStr();
+			LineSliceResult slice = PaginationHelper.sliceLines(code, null, null, maxChars);
 			JsonObject out = new JsonObject();
 			out.addProperty("className", cls.getFullName());
 			out.addProperty("ambiguous", false);
 			out.addProperty("name", target.getName());
 			out.addProperty("shortId", target.getShortId());
 			out.addProperty("fullName", target.getFullName());
+			out.addProperty("mode", smaliMode ? "smali" : "java");
 			out.addProperty("truncated", slice.isTruncated());
 			out.addProperty("code", slice.getContent());
 			return out;
+		}
+
+		private static String extractMethodSmali(String classSmali, String shortId) {
+			if (classSmali == null || classSmali.isEmpty() || shortId == null || shortId.isEmpty()) {
+				return "";
+			}
+			String[] lines = classSmali.split("\\R");
+			StringBuilder sb = new StringBuilder();
+			boolean inside = false;
+			for (String line : lines) {
+				String trimmed = line.trim();
+				if (!inside) {
+					if (trimmed.startsWith(".method ") && trimmed.endsWith(shortId)) {
+						int lastSpace = trimmed.lastIndexOf(' ');
+						String token = lastSpace >= 0 ? trimmed.substring(lastSpace + 1) : trimmed;
+						if (shortId.equals(token)) {
+							inside = true;
+							sb.append(line).append('\n');
+						}
+					}
+				} else {
+					sb.append(line).append('\n');
+					if (".end method".equals(trimmed)) {
+						break;
+					}
+				}
+			}
+			return sb.toString().trim();
 		}
 
 		private static List<JavaMethod> findMatchingMethods(JavaClass cls, String methodName, String shortId) {
