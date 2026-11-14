@@ -77,7 +77,8 @@ class V030FeaturesTest {
 
 	private static Path copyClass(Class<?> cls, String name) throws Exception {
 		Path out = tempDir.resolve(name);
-		try (InputStream in = cls.getResourceAsStream(cls.getSimpleName() + ".class")) {
+		String resName = cls.getName().substring(cls.getPackageName().length() + 1) + ".class";
+		try (InputStream in = cls.getResourceAsStream(resName)) {
 			assertThat(in).isNotNull();
 			Files.copy(in, out);
 		}

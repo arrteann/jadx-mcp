@@ -41,7 +41,7 @@ class McpStatusSnapshotTest {
 			assertThat(snap.getStatusText()).isEqualTo("Running on port " + manager.getActivePort());
 			assertThat(snap.getEndpointUrl()).isEqualTo(manager.getActiveUrl());
 			assertThat(snap.getAuthText()).isEqualTo("Bearer token enabled");
-			assertThat(snap.getToolCount()).isEqualTo(2);
+			assertThat(snap.getToolCount()).isEqualTo(3);
 			assertThat(snap.getRequestCount()).isEqualTo(1L);
 			assertThat(snap.getUptimeText()).endsWith("s");
 			assertThat(snap.getClientConfigJson()).contains("Bearer secret-123");
