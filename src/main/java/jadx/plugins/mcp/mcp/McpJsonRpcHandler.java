@@ -16,15 +16,21 @@ public final class McpJsonRpcHandler {
 	public static final String PROTOCOL_VERSION = "2025-03-26";
 	private static final String JSONRPC_VERSION = "2.0";
 
+	@FunctionalInterface
+	public interface ToolCallListener {
+		void onToolCall(String toolName, long durationMs, boolean success);
+	}
+
 	private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 	private final McpToolRegistry registry;
 	private final McpPromptRegistry promptRegistry;
 	private final McpResourceRegistry resourceRegistry;
 	private final String serverName;
 	private final String serverVersion;
+	private final ToolCallListener toolCallListener;
 
 	public McpJsonRpcHandler(McpToolRegistry registry, String serverName, String serverVersion) {
-		this(registry, new McpPromptRegistry(), new McpResourceRegistry(), serverName, serverVersion);
+		this(registry, new McpPromptRegistry(), new McpResourceRegistry(), serverName, serverVersion, null);
 	}
 
 	public McpJsonRpcHandler(
@@ -33,11 +39,22 @@ public final class McpJsonRpcHandler {
 			McpResourceRegistry resourceRegistry,
 			String serverName,
 			String serverVersion) {
+		this(registry, promptRegistry, resourceRegistry, serverName, serverVersion, null);
+	}
+
+	public McpJsonRpcHandler(
+			McpToolRegistry registry,
+			McpPromptRegistry promptRegistry,
+			McpResourceRegistry resourceRegistry,
+			String serverName,
+			String serverVersion,
+			ToolCallListener toolCallListener) {
 		this.registry = registry;
 		this.promptRegistry = promptRegistry == null ? new McpPromptRegistry() : promptRegistry;
 		this.resourceRegistry = resourceRegistry == null ? new McpResourceRegistry() : resourceRegistry;
 		this.serverName = serverName;
 		this.serverVersion = serverVersion;
+		this.toolCallListener = toolCallListener;
 	}
 
 	/**
@@ -194,8 +211,10 @@ public final class McpJsonRpcHandler {
 				? params.getAsJsonObject("arguments")
 				: new JsonObject();
 
+		long startNs = System.nanoTime();
 		try {
 			JsonElement output = tool.execute(arguments);
+			notifyToolCall(toolName, startNs, true);
 			String text = output == null
 					? ""
 					: (output.isJsonPrimitive() && output.getAsJsonPrimitive().isString()
@@ -203,8 +222,16 @@ public final class McpJsonRpcHandler {
 							: gson.toJson(output));
 			return buildToolResponse(text, false);
 		} catch (Exception e) {
+			notifyToolCall(toolName, startNs, false);
 			String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
 			return buildToolResponse("Error executing tool '" + toolName + "': " + msg, true);
+		}
+	}
+
+	private void notifyToolCall(String toolName, long startNs, boolean success) {
+		if (toolCallListener != null) {
+			long durationMs = (System.nanoTime() - startNs) / 1_000_000L;
+			toolCallListener.onToolCall(toolName, durationMs, success);
 		}
 	}
 

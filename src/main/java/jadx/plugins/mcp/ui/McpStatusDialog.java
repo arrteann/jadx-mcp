@@ -48,6 +48,7 @@ public final class McpStatusDialog extends JDialog {
 	private final JLabel uptimeValue = new JLabel();
 	private final JComboBox<ClientFormat> formatSelector = new JComboBox<>(ClientFormat.values());
 	private final JTextArea configArea = new JTextArea(8, 44);
+	private final JTextArea activityArea = new JTextArea(4, 44);
 	private final JButton toggleButton = new JButton();
 	private final JButton testButton = new JButton("Test Connection");
 	private final JButton copyButton = new JButton("Copy Config");
@@ -65,7 +66,7 @@ public final class McpStatusDialog extends JDialog {
 		JPanel content = new JPanel(new BorderLayout(10, 10));
 		content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 		content.add(buildStatusPanel(), BorderLayout.NORTH);
-		content.add(buildConfigPanel(), BorderLayout.CENTER);
+		content.add(buildCenterPanel(), BorderLayout.CENTER);
 		content.add(buildButtonsPanel(), BorderLayout.SOUTH);
 		add(content, BorderLayout.CENTER);
 
@@ -130,6 +131,22 @@ public final class McpStatusDialog extends JDialog {
 		title.setFont(title.getFont().deriveFont(Font.BOLD));
 		panel.add(title, labelGbc);
 		panel.add(value, valueGbc);
+	}
+
+	private JPanel buildCenterPanel() {
+		JPanel center = new JPanel(new BorderLayout(8, 8));
+		center.add(buildConfigPanel(), BorderLayout.CENTER);
+		center.add(buildActivityPanel(), BorderLayout.SOUTH);
+		return center;
+	}
+
+	private JPanel buildActivityPanel() {
+		JPanel panel = new JPanel(new BorderLayout(4, 4));
+		panel.setBorder(BorderFactory.createTitledBorder("Recent Tool Activity"));
+		activityArea.setEditable(false);
+		activityArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
+		panel.add(new JScrollPane(activityArea), BorderLayout.CENTER);
+		return panel;
 	}
 
 	private JPanel buildConfigPanel() {
@@ -251,6 +268,10 @@ public final class McpStatusDialog extends JDialog {
 		if (!snapshot.getClientConfigJson().equals(configArea.getText())) {
 			configArea.setText(snapshot.getClientConfigJson());
 			configArea.setCaretPosition(0);
+		}
+		if (!snapshot.getRecentActivityText().equals(activityArea.getText())) {
+			activityArea.setText(snapshot.getRecentActivityText());
+			activityArea.setCaretPosition(0);
 		}
 		toggleButton.setText(snapshot.isRunning() ? "Stop Server" : "Start Server");
 	}

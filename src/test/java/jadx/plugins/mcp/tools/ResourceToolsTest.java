@@ -107,6 +107,14 @@ class ResourceToolsTest {
 		readArgs.addProperty("name", "res/values/strings.xml");
 		JsonObject readRes = callTool("read_resource", readArgs);
 		assertThat(readRes.get("content").getAsString()).contains("DemoApp");
+
+		JsonObject searchArgs = new JsonObject();
+		searchArgs.addProperty("query", "Demo[A-Za-z]+");
+		searchArgs.addProperty("regex", true);
+		searchArgs.addProperty("nameFilter", "strings.xml");
+		JsonObject searchRes = callTool("search_resources", searchArgs);
+		assertThat(searchRes.get("total").getAsInt()).isEqualTo(1);
+		assertThat(searchRes.getAsJsonArray("items").toString()).contains("DemoApp");
 	}
 
 	@Test

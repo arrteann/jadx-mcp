@@ -40,6 +40,7 @@ public final class SearchTools {
 		registry.register(new SearchStringsTool(manager));
 		registry.register(new SearchCodeTool(manager));
 		registry.register(new FindSinkCallSitesTool(manager));
+		registry.register(new FindJniMethodsTool(manager));
 	}
 
 	private static Map<String, List<SinkRule>> buildSinkRules() {
@@ -393,6 +394,144 @@ public final class SearchTools {
 				throw new IllegalArgumentException("Unknown sink category: " + category);
 			}
 			return Map.of(category, rules);
+		}
+	}
+
+	private static final class FindJniMethodsTool implements McpTool {
+		private static final List<SinkRule> LOAD_RULES = List.of(
+				new SinkRule("java/lang/System", "loadLibrary"),
+				new SinkRule("java/lang/System", "load"),
+				new SinkRule("java/lang/Runtime", "loadLibrary"),
+				new SinkRule("java/lang/Runtime", "load"));
+
+		private final McpServerManager manager;
+
+		private FindJniMethodsTool(McpServerManager manager) {
+			this.manager = manager;
+		}
+
+		@Override
+		public String getName() {
+			return "find_jni_methods";
+		}
+
+		@Override
+		public String getDescription() {
+			return "List all native Java/Kotlin methods with their standard JNI symbol names, plus System.loadLibrary/load call sites.";
+		}
+
+		@Override
+		public JsonObject getInputSchema() {
+			JsonObject props = new JsonObject();
+			ToolSupport.addClassFilterProps(props);
+			props.add("offset", ToolSupport.prop("integer", "Pagination offset for nativeMethods"));
+			props.add("limit", ToolSupport.prop("integer", "Page size for nativeMethods"));
+			return ToolSupport.schema(props);
+		}
+
+		@Override
+		public JsonElement execute(JsonObject arguments) {
+			JadxDecompiler decompiler = ToolSupport.requireDecompiler(manager);
+			int offset = ToolSupport.getInt(arguments, "offset", 0);
+			int limit = ToolSupport.getInt(arguments, "limit", PaginationHelper.DEFAULT_LIMIT);
+
+			List<JsonObject> nativeMethods = new ArrayList<>();
+			JsonArray libraryLoads = new JsonArray();
+
+			for (JavaClass cls : decompiler.getClassesWithInners()) {
+				if (ToolSupport.shouldSkipClass(cls.getFullName(), arguments)) {
+					continue;
+				}
+				Map<String, Integer> nativeNameCounts = new LinkedHashMap<>();
+				for (JavaMethod mth : cls.getMethods()) {
+					if (mth.getAccessFlags().isNative()) {
+						nativeNameCounts.merge(mth.getName(), 1, Integer::sum);
+					}
+				}
+				for (JavaMethod mth : cls.getMethods()) {
+					if (mth.getAccessFlags().isNative()) {
+						boolean overloaded = nativeNameCounts.getOrDefault(mth.getName(), 0) > 1;
+						JsonObject item = new JsonObject();
+						item.addProperty("className", cls.getFullName());
+						item.addProperty("methodName", mth.getName());
+						item.addProperty("shortId", mth.getShortId());
+						item.addProperty("overloaded", overloaded);
+						item.addProperty("jniSymbol", buildJniSymbol(cls.getRawName(), mth.getName(), mth.getShortId(), overloaded));
+						nativeMethods.add(item);
+					}
+					if (mth.getMethodNode().isNoCode()) {
+						continue;
+					}
+					ICodeReader reader = mth.getMethodNode().getCodeReader();
+					if (reader == null) {
+						continue;
+					}
+					reader.visitInstructions(insn -> {
+						IMethodRef ref = ToolSupport.readMethodRef(insn);
+						if (ref == null) {
+							return;
+						}
+						for (SinkRule rule : LOAD_RULES) {
+							if (rule.matches(ref)) {
+								JsonObject load = new JsonObject();
+								load.addProperty("callerClass", cls.getFullName());
+								load.addProperty("callerMethod", mth.getName());
+								load.addProperty("callerShortId", mth.getShortId());
+								load.addProperty("target", ref.getParentClassType() + "->" + ref.getName());
+								libraryLoads.add(load);
+								break;
+							}
+						}
+					});
+				}
+			}
+
+			JsonObject out = buildPagedObject(nativeMethods, offset, limit, false);
+			out.add("libraryLoads", libraryLoads);
+			return out;
+		}
+
+		static String buildJniSymbol(String rawClassName, String methodName, String shortId, boolean overloaded) {
+			String base = "Java_" + mangleJni(rawClassName.replace('.', '/')) + "_" + mangleJni(methodName);
+			if (!overloaded || shortId == null) {
+				return base;
+			}
+			int open = shortId.indexOf('(');
+			int close = shortId.indexOf(')');
+			if (open >= 0 && close > open) {
+				return base + "__" + mangleJni(shortId.substring(open + 1, close));
+			}
+			return base;
+		}
+
+		private static String mangleJni(String s) {
+			StringBuilder sb = new StringBuilder(s.length());
+			for (int i = 0; i < s.length(); i++) {
+				char c = s.charAt(i);
+				switch (c) {
+					case '/':
+					case '.':
+						sb.append('_');
+						break;
+					case '_':
+						sb.append("_1");
+						break;
+					case ';':
+						sb.append("_2");
+						break;
+					case '[':
+						sb.append("_3");
+						break;
+					default:
+						if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+							sb.append(c);
+						} else {
+							sb.append(String.format("_0%04x", (int) c));
+						}
+						break;
+				}
+			}
+			return sb.toString();
 		}
 	}
 

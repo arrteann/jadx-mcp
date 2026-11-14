@@ -22,6 +22,7 @@ public final class McpStatusSnapshot {
 	private final String uptimeText;
 	private final String lastError;
 	private final String clientConfigJson;
+	private final String recentActivityText;
 
 	private McpStatusSnapshot(
 			boolean running,
@@ -32,7 +33,8 @@ public final class McpStatusSnapshot {
 			int toolCount,
 			String uptimeText,
 			String lastError,
-			String clientConfigJson) {
+			String clientConfigJson,
+			String recentActivityText) {
 		this.running = running;
 		this.statusText = statusText;
 		this.endpointUrl = endpointUrl;
@@ -42,6 +44,7 @@ public final class McpStatusSnapshot {
 		this.uptimeText = uptimeText;
 		this.lastError = lastError;
 		this.clientConfigJson = clientConfigJson;
+		this.recentActivityText = recentActivityText;
 	}
 
 	public static McpStatusSnapshot capture(McpServerManager manager, McpOptions options) {
@@ -79,6 +82,8 @@ public final class McpStatusSnapshot {
 		String uptimeText = formatUptime(manager.getStartedAt(), now);
 		ClientFormat resolvedFormat = format == null ? ClientFormat.MCP_SERVERS : format;
 		String configJson = GuiTools.buildClientConfigJson(configUrl, token, resolvedFormat);
+		java.util.List<String> activity = manager.getRecentActivity();
+		String recentActivityText = activity.isEmpty() ? "No tool calls yet." : String.join("\n", activity);
 
 		return new McpStatusSnapshot(
 				running,
@@ -89,7 +94,8 @@ public final class McpStatusSnapshot {
 				manager.getToolCount(),
 				uptimeText,
 				lastError,
-				configJson);
+				configJson,
+				recentActivityText);
 	}
 
 	static String formatUptime(Instant startedAt, Instant now) {
@@ -143,5 +149,9 @@ public final class McpStatusSnapshot {
 
 	public String getClientConfigJson() {
 		return clientConfigJson;
+	}
+
+	public String getRecentActivityText() {
+		return recentActivityText;
 	}
 }

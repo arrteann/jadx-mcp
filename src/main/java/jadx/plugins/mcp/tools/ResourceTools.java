@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -21,6 +23,7 @@ import jadx.api.ICodeInfo;
 import jadx.api.JadxDecompiler;
 import jadx.api.ResourceFile;
 import jadx.api.ResourceType;
+import jadx.api.resources.ResourceContentType;
 import jadx.core.xmlgen.ResContainer;
 import jadx.plugins.mcp.McpOptions;
 import jadx.plugins.mcp.McpServerManager;
@@ -43,6 +46,7 @@ public final class ResourceTools {
 	public static void register(McpToolRegistry registry, McpServerManager manager, McpOptions options) {
 		registry.register(new ListResourcesTool(manager));
 		registry.register(new ReadResourceTool(manager, options));
+		registry.register(new SearchResourcesTool(manager));
 		registry.register(new GetAndroidManifestTool(manager, options));
 		registry.register(new GetAttackSurfaceTool(manager));
 	}
@@ -428,6 +432,128 @@ public final class ResourceTools {
 				}
 			}
 			return "";
+		}
+	}
+
+	private static final class SearchResourcesTool implements McpTool {
+		private static final int DEFAULT_TIME_LIMIT_MS = 5000;
+		private static final int MAX_RESOURCE_CHARS = 512 * 1024;
+		private static final int MAX_PREVIEW_CHARS = 200;
+
+		private final McpServerManager manager;
+
+		private SearchResourcesTool(McpServerManager manager) {
+			this.manager = manager;
+		}
+
+		@Override
+		public String getName() {
+			return "search_resources";
+		}
+
+		@Override
+		public String getDescription() {
+			return "Search text resources (XML, JSON, HTML, manifest, properties) with optional regex and time budget.";
+		}
+
+		@Override
+		public JsonObject getInputSchema() {
+			JsonObject props = new JsonObject();
+			props.add("query", ToolSupport.prop("string", "Substring or regex pattern to match"));
+			props.add("regex", ToolSupport.prop("boolean", "Treat query as case-insensitive regex (default false)"));
+			props.add("nameFilter", ToolSupport.prop("string", "Optional case-insensitive path filter (e.g. res/values)"));
+			props.add("timeLimitMs", ToolSupport.prop("integer", "Time budget in milliseconds"));
+			props.add("offset", ToolSupport.prop("integer", "Pagination offset"));
+			props.add("limit", ToolSupport.prop("integer", "Page size"));
+			return ToolSupport.schema(props, "query");
+		}
+
+		@Override
+		public JsonElement execute(JsonObject arguments) {
+			JadxDecompiler decompiler = ToolSupport.requireDecompiler(manager);
+			String rawQuery = ToolSupport.getString(arguments, "query", "");
+			boolean useRegex = ToolSupport.getBoolean(arguments, "regex", false);
+			Pattern pattern = compilePattern(rawQuery, useRegex);
+			String lowerQuery = rawQuery.toLowerCase(Locale.ROOT);
+			String nameFilter = ToolSupport.getString(arguments, "nameFilter", "").trim().toLowerCase(Locale.ROOT);
+			int timeLimitMs = ToolSupport.getInt(arguments, "timeLimitMs", DEFAULT_TIME_LIMIT_MS);
+			int offset = ToolSupport.getInt(arguments, "offset", 0);
+			int limit = ToolSupport.getInt(arguments, "limit", PaginationHelper.DEFAULT_LIMIT);
+
+			long deadline = System.currentTimeMillis() + Math.max(100, timeLimitMs);
+			boolean timedOut = false;
+			List<JsonObject> matches = new ArrayList<>();
+
+			for (ResourceFile res : decompiler.getResources()) {
+				if (System.currentTimeMillis() > deadline) {
+					timedOut = true;
+					break;
+				}
+				if (res.getType() == null || res.getType().getContentType() != ResourceContentType.CONTENT_TEXT) {
+					continue;
+				}
+				String resName = res.getOriginalName();
+				if (resName == null) {
+					continue;
+				}
+				if (!nameFilter.isEmpty() && !resName.toLowerCase(Locale.ROOT).contains(nameFilter)) {
+					continue;
+				}
+				String text;
+				try {
+					text = loadResourceText(res);
+				} catch (Exception e) {
+					continue;
+				}
+				if (text.length() > MAX_RESOURCE_CHARS) {
+					text = text.substring(0, MAX_RESOURCE_CHARS);
+				}
+				String[] lines = text.split("\\R", -1);
+				for (int i = 0; i < lines.length; i++) {
+					String line = lines[i];
+					boolean hit = pattern != null
+							? pattern.matcher(line).find()
+							: line.toLowerCase(Locale.ROOT).contains(lowerQuery);
+					if (hit) {
+						JsonObject item = new JsonObject();
+						item.addProperty("name", resName);
+						item.addProperty("type", res.getType().name());
+						item.addProperty("line", i + 1);
+						String trimmed = line.trim();
+						if (trimmed.length() > MAX_PREVIEW_CHARS) {
+							trimmed = trimmed.substring(0, MAX_PREVIEW_CHARS) + "...";
+						}
+						item.addProperty("preview", trimmed);
+						matches.add(item);
+					}
+				}
+			}
+
+			PageResult<JsonObject> page = PaginationHelper.paginate(matches, offset, limit);
+			JsonArray arr = new JsonArray();
+			for (JsonObject item : page.getItems()) {
+				arr.add(item);
+			}
+			JsonObject out = new JsonObject();
+			out.add("items", arr);
+			out.addProperty("offset", page.getOffset());
+			out.addProperty("limit", page.getLimit());
+			out.addProperty("total", page.getTotal());
+			out.addProperty("hasMore", page.isHasMore());
+			out.addProperty("nextOffset", page.getNextOffset());
+			out.addProperty("timedOut", timedOut);
+			return out;
+		}
+
+		private static Pattern compilePattern(String rawQuery, boolean useRegex) {
+			if (!useRegex) {
+				return null;
+			}
+			try {
+				return Pattern.compile(rawQuery, Pattern.CASE_INSENSITIVE);
+			} catch (PatternSyntaxException e) {
+				throw new IllegalArgumentException("Invalid regex pattern: " + e.getMessage());
+			}
 		}
 	}
 }
