@@ -30,6 +30,8 @@ Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly 
 
 ## Documentation
 
+Browse the [GitHub Wiki](https://github.com/arrteann/jadx-mcp/wiki) or read the pages directly in [`docs/`](docs/):
+
 - [Installation & Client Setup](docs/Installation.md) — Plugin Manager, GitHub Releases, source build, and MCP client configs
 - [MCP Tools Reference (24 Tools)](docs/Tools-Reference.md) — Parameters, filters, pagination, and character budgets
 - [Built-in Prompts & Resources](docs/Prompts-and-Resources.md) — Security audit prompts and `jadx://` URIs
