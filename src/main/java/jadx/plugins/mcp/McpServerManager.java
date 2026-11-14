@@ -2,6 +2,7 @@ package jadx.plugins.mcp;
 
 import java.io.IOException;
 import java.net.BindException;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
@@ -28,6 +29,8 @@ public final class McpServerManager {
 	private final String serverVersion;
 
 	private MicroHttpServer server;
+	private Instant startedAt;
+	private volatile String lastError;
 
 	public McpServerManager(String serverVersion) {
 		this.serverVersion = serverVersion;
@@ -61,6 +64,8 @@ public final class McpServerManager {
 		MicroHttpServer created = bindWithFallback(preferredPort, autoFallback, rpc, security);
 		created.start();
 		this.server = created;
+		this.startedAt = Instant.now();
+		this.lastError = null;
 		LOG.info("JADX MCP server listening on {}", getActiveUrl());
 	}
 
@@ -96,6 +101,7 @@ public final class McpServerManager {
 		if (server != null) {
 			server.close();
 			server = null;
+			startedAt = null;
 			LOG.info("JADX MCP server stopped");
 		}
 	}
@@ -110,5 +116,29 @@ public final class McpServerManager {
 
 	public synchronized String getActiveUrl() {
 		return server == null ? null : "http://127.0.0.1:" + server.getPort() + "/mcp";
+	}
+
+	public synchronized long getRequestCount() {
+		return server == null ? 0L : server.getRequestCount();
+	}
+
+	public synchronized Instant getStartedAt() {
+		return startedAt;
+	}
+
+	public String getLastError() {
+		return lastError;
+	}
+
+	public void setLastError(String lastError) {
+		this.lastError = lastError;
+	}
+
+	public int getToolCount() {
+		return registry.listAll().size();
+	}
+
+	public String getServerVersion() {
+		return serverVersion;
 	}
 }

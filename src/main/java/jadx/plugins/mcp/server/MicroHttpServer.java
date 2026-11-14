@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,7 @@ public final class MicroHttpServer implements Closeable {
 	private final ServerSocket serverSocket;
 	private final ExecutorService executor;
 	private final AtomicBoolean running = new AtomicBoolean(false);
+	private final AtomicLong requestCount = new AtomicLong(0);
 	private Thread acceptThread;
 
 	public MicroHttpServer(int port, McpJsonRpcHandler rpcHandler, HttpSecurityValidator security) throws IOException {
@@ -53,6 +55,10 @@ public final class MicroHttpServer implements Closeable {
 
 	public int getPort() {
 		return serverSocket.getLocalPort();
+	}
+
+	public long getRequestCount() {
+		return requestCount.get();
 	}
 
 	public void start() {
@@ -87,6 +93,7 @@ public final class MicroHttpServer implements Closeable {
 			if (requestLine == null || requestLine.isEmpty()) {
 				return;
 			}
+			requestCount.incrementAndGet();
 			String[] parts = requestLine.split(" ");
 			if (parts.length < 2) {
 				writeResponse(out, 400, "Bad Request", "text/plain; charset=utf-8", "Bad Request", null);

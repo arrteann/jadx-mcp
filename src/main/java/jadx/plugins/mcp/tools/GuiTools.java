@@ -21,6 +21,7 @@ import jadx.plugins.mcp.McpOptions;
 import jadx.plugins.mcp.McpServerManager;
 import jadx.plugins.mcp.mcp.McpTool;
 import jadx.plugins.mcp.mcp.McpToolRegistry;
+import jadx.plugins.mcp.ui.McpStatusDialog;
 
 /**
  * GUI context, navigation, rename, and one-click client config copy tools.
@@ -42,6 +43,7 @@ public final class GuiTools {
 		if (guiContext == null) {
 			return;
 		}
+		guiContext.addMenuAction("JADX MCP Server...", () -> McpStatusDialog.show(guiContext, manager, options));
 		guiContext.addMenuAction("Copy MCP Server Config", () -> {
 			String url = manager.getActiveUrl();
 			if (url == null) {

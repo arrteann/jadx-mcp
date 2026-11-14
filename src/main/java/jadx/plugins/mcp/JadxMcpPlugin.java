@@ -81,12 +81,14 @@ public final class JadxMcpPlugin implements JadxPlugin {
 			return;
 		}
 		if (!options.isEnabled()) {
+			serverManager.setLastError(null);
 			serverManager.stop();
 			return;
 		}
 		try {
 			serverManager.start(options.getPort(), options.isAutoPortFallback(), options.getToken());
 		} catch (IOException e) {
+			serverManager.setLastError(e.getMessage());
 			LOG.error("Failed to start JADX MCP server on port {}: {}", options.getPort(), e.getMessage());
 		}
 	}
