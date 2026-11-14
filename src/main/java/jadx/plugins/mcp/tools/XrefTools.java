@@ -198,8 +198,10 @@ public final class XrefTools {
 		private static void collectRawBytecodeMethodCallers(JadxDecompiler decompiler, JavaClass targetCls,
 				List<JavaMethod> targets, Set<String> refs) {
 			String rawInternal = "L" + targetCls.getRawName().replace('.', '/') + ";";
+			Set<String> targetShortIds = new LinkedHashSet<>();
 			Set<String> targetNames = new LinkedHashSet<>();
 			for (JavaMethod m : targets) {
+				targetShortIds.add(m.getShortId());
 				targetNames.add(m.getName());
 			}
 			for (JavaClass cls : decompiler.getClassesWithInners()) {
@@ -220,9 +222,18 @@ public final class XrefTools {
 						String parent = ref.getParentClassType();
 						boolean sameClass = rawInternal.equals(parent) || targetCls.getRawName().equals(parent)
 								|| targetCls.getFullName().equals(parent);
-						if (sameClass && targetNames.contains(ref.getName())) {
-							refs.add(mth.getFullName());
+						if (!sameClass || !targetNames.contains(ref.getName())) {
+							return;
 						}
+						List<String> argTypes = ref.getArgTypes();
+						String retType = ref.getReturnType();
+						if (argTypes != null && retType != null) {
+							String refShortId = ref.getName() + "(" + String.join("", argTypes) + ")" + retType;
+							if (!targetShortIds.contains(refShortId)) {
+								return;
+							}
+						}
+						refs.add(mth.getFullName());
 					});
 				}
 			}

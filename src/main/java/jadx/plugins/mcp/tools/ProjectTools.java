@@ -118,6 +118,7 @@ public final class ProjectTools {
 			JsonObject props = new JsonObject();
 			props.add("packagePrefix", ToolSupport.prop("string", "Optional package prefix filter"));
 			props.add("query", ToolSupport.prop("string", "Optional case-insensitive substring filter"));
+			ToolSupport.addClassFilterProps(props);
 			props.add("offset", ToolSupport.prop("integer", "Pagination offset (default 0)"));
 			props.add("limit", ToolSupport.prop("integer", "Page size (default 50, max 500)"));
 			return ToolSupport.schema(props);
@@ -134,6 +135,9 @@ public final class ProjectTools {
 			List<String> matched = new ArrayList<>();
 			for (JavaClass cls : decompiler.getClasses()) {
 				String name = cls.getFullName();
+				if (ToolSupport.shouldSkipClass(name, arguments)) {
+					continue;
+				}
 				if (!pkgPrefix.isEmpty() && !name.startsWith(pkgPrefix)) {
 					continue;
 				}

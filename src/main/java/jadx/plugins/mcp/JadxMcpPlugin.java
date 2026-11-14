@@ -23,7 +23,13 @@ import jadx.plugins.mcp.tools.XrefTools;
 public final class JadxMcpPlugin implements JadxPlugin {
 
 	public static final String PLUGIN_ID = "jadx-mcp";
-	public static final String VERSION = "0.1.0";
+	public static final String VERSION = resolveVersion();
+
+	private static String resolveVersion() {
+		Package pkg = JadxMcpPlugin.class.getPackage();
+		String implVersion = pkg == null ? null : pkg.getImplementationVersion();
+		return (implVersion == null || implVersion.isBlank()) ? "dev" : implVersion;
+	}
 
 	private static final Logger LOG = LoggerFactory.getLogger(JadxMcpPlugin.class);
 

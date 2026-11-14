@@ -58,11 +58,75 @@ public final class ToolSupport {
 		return args.get(key).getAsString();
 	}
 
+	private static final String[] LIBRARY_PREFIXES = {
+			"androidx.",
+			"android.support.",
+			"kotlin.",
+			"kotlinx.",
+			"com.google.android.gms.",
+			"com.google.firebase.",
+			"org.apache.",
+			"okhttp3.",
+			"okio.",
+			"retrofit2.",
+			"io.reactivex.",
+			"com.bumptech.glide.",
+			"com.squareup."
+	};
+
 	public static int getInt(JsonObject args, String key, int defaultValue) {
 		if (args == null || !args.has(key) || args.get(key).isJsonNull()) {
 			return defaultValue;
 		}
 		return args.get(key).getAsInt();
+	}
+
+	public static boolean getBoolean(JsonObject args, String key, boolean defaultValue) {
+		if (args == null || !args.has(key) || args.get(key).isJsonNull()) {
+			return defaultValue;
+		}
+		return args.get(key).getAsBoolean();
+	}
+
+	public static void addClassFilterProps(JsonObject props) {
+		props.add("excludeLibraries", prop("boolean", "Skip common third-party/AndroidX library packages (default false)"));
+		props.add("excludeGenerated", prop("boolean", "Skip generated R, R$*, and BuildConfig classes (default false)"));
+		props.add("excludePrefixes", prop("string", "Optional comma-separated package/class prefixes to skip"));
+	}
+
+	public static boolean shouldSkipClass(String fullName, JsonObject args) {
+		if (fullName == null) {
+			return true;
+		}
+		if (getBoolean(args, "excludeGenerated", false) && isGeneratedClass(fullName)) {
+			return true;
+		}
+		if (getBoolean(args, "excludeLibraries", false)) {
+			for (String prefix : LIBRARY_PREFIXES) {
+				if (fullName.startsWith(prefix)) {
+					return true;
+				}
+			}
+		}
+		String custom = getString(args, "excludePrefixes", "").trim();
+		if (!custom.isEmpty()) {
+			for (String raw : custom.split(",")) {
+				String prefix = raw.trim();
+				if (!prefix.isEmpty() && fullName.startsWith(prefix)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static boolean isGeneratedClass(String fullName) {
+		return fullName.endsWith(".R")
+				|| fullName.contains(".R$")
+				|| fullName.endsWith(".BuildConfig")
+				|| "R".equals(fullName)
+				|| fullName.startsWith("R$")
+				|| "BuildConfig".equals(fullName);
 	}
 
 	public static Integer getNullableInt(JsonObject args, String key) {

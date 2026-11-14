@@ -103,6 +103,7 @@ public final class SearchTools {
 			JsonObject props = new JsonObject();
 			props.add("query", ToolSupport.prop("string", "Case-insensitive substring to match"));
 			props.add("kind", ToolSupport.prop("string", "Filter: all, class, method, or field"));
+			ToolSupport.addClassFilterProps(props);
 			props.add("offset", ToolSupport.prop("integer", "Pagination offset"));
 			props.add("limit", ToolSupport.prop("integer", "Page size"));
 			return ToolSupport.schema(props, "query");
@@ -118,6 +119,9 @@ public final class SearchTools {
 
 			List<JsonObject> matches = new ArrayList<>();
 			for (JavaClass cls : decompiler.getClassesWithInners()) {
+				if (ToolSupport.shouldSkipClass(cls.getFullName(), arguments)) {
+					continue;
+				}
 				if (("all".equals(kind) || "class".equals(kind))
 						&& cls.getFullName().toLowerCase(Locale.ROOT).contains(query)) {
 					matches.add(symbolEntry("class", cls.getFullName(), cls.getFullName(), ""));
@@ -303,6 +307,7 @@ public final class SearchTools {
 		public JsonObject getInputSchema() {
 			JsonObject props = new JsonObject();
 			props.add("category", ToolSupport.prop("string", "Category: all, process, native, webview, crypto, or network"));
+			ToolSupport.addClassFilterProps(props);
 			props.add("offset", ToolSupport.prop("integer", "Pagination offset"));
 			props.add("limit", ToolSupport.prop("integer", "Page size"));
 			return ToolSupport.schema(props);
@@ -318,6 +323,9 @@ public final class SearchTools {
 			Map<String, List<SinkRule>> activeRules = selectRules(category);
 			List<JsonObject> matches = new ArrayList<>();
 			for (JavaClass cls : decompiler.getClassesWithInners()) {
+				if (ToolSupport.shouldSkipClass(cls.getFullName(), arguments)) {
+					continue;
+				}
 				for (JavaMethod mth : cls.getMethods()) {
 					if (mth.getMethodNode().isNoCode()) {
 						continue;
