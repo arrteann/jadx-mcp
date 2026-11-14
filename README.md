@@ -28,6 +28,28 @@ Unlike multi-process bridges or 20 MB fat-JAR plugins, `jadx-mcp` runs directly 
 
 ---
 
+## Documentation
+
+- [Installation & Client Setup](docs/Installation.md) — Plugin Manager, GitHub Releases, source build, and MCP client configs
+- [MCP Tools Reference (24 Tools)](docs/Tools-Reference.md) — Parameters, filters, pagination, and character budgets
+- [Built-in Prompts & Resources](docs/Prompts-and-Resources.md) — Security audit prompts and `jadx://` URIs
+- [Architecture & Security](docs/Architecture-and-Security.md) — Zero-dependency HTTP engine, bytecode accuracy, and security model
+- [Troubleshooting](docs/Troubleshooting.md) — Port fallback, authentication, JADX version, and timeouts
+
+---
+
+## Installation
+
+Install directly via JADX Plugin Manager:
+
+```bash
+jadx plugins --install "github:arrteann:jadx-mcp"
+```
+
+Or download `jadx-mcp-<version>.jar` from [GitHub Releases](https://github.com/arrteann/jadx-mcp/releases). See [docs/Installation.md](docs/Installation.md) for full details.
+
+---
+
 ## Build & Test
 
 Requires Java 11+ (uses `options.release = 11`). When `../jadx` is present alongside this directory, Gradle automatically uses the composite build; otherwise configure a published `jadx-core` artifact.
@@ -42,11 +64,7 @@ To build and install directly into a sibling `../jadx/build/jadx` distribution f
 ./gradlew installToJadx
 ```
 
-The output plugin JAR is generated at:
-
-```text
-build/libs/jadx-mcp-0.1.0-SNAPSHOT.jar
-```
+The output plugin JAR is generated under `build/libs/jadx-mcp-<version>.jar`.
 
 ---
 
