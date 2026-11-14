@@ -98,13 +98,14 @@ public final class XrefTools {
 					if (ref == null) {
 						return;
 					}
-					String key = ref.getParentClassType() + "->" + ref.getName() + ref.getReturnType() + ref.getArgTypes();
+					List<String> argTypes = ref.getArgTypes();
+					String key = ref.getParentClassType() + "->" + ref.getName() + ref.getReturnType() + argTypes;
 					if (!callees.containsKey(key)) {
 						JsonObject entry = new JsonObject();
 						entry.addProperty("className", ref.getParentClassType());
 						entry.addProperty("methodName", ref.getName());
 						entry.addProperty("returnType", String.valueOf(ref.getReturnType()));
-						entry.addProperty("argCount", ref.getArgTypes().size());
+						entry.addProperty("argCount", argTypes == null ? 0 : argTypes.size());
 						callees.put(key, entry);
 					}
 				});

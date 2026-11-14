@@ -106,7 +106,11 @@ public final class ToolSupport {
 			return null;
 		}
 		insn.decode();
-		return InsnDataUtils.getMethodRef(insn);
+		IMethodRef ref = InsnDataUtils.getMethodRef(insn);
+		if (ref != null) {
+			ref.load();
+		}
+		return ref;
 	}
 
 	public static String readStringRef(InsnData insn) {
